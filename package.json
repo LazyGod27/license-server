@@ -1,0 +1,6 @@
+{
+  "name": "license-server",
+  "scripts": {
+    "start": "gunicorn run:app"
+  }
+}
