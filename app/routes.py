@@ -32,7 +32,7 @@ def register_routes(app):
         if datetime.utcnow() > license.expires_at:
             return jsonify({'error': 'License expired'}), 401
         
-        # Generate hardware ID (simplified)
+        # Generate hardware ID
         hwid_string = f"{hardware_data.get('cpu_id', '')}|{hardware_data.get('mac', '')}"
         hardware_id = hashlib.sha256(hwid_string.encode()).hexdigest()
         
