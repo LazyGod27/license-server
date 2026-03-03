@@ -1,6 +1,7 @@
 from flask import request, jsonify, current_app
-from .models import db, License, Activation, AuditLog
+from .models import License, Activation, AuditLog
 from datetime import datetime
+from . import db
 import time
 import json
 import hashlib

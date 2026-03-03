@@ -1,8 +1,8 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from . import db
 import json
 
-db = SQLAlchemy()
 
 class License(db.Model):
     __tablename__ = 'licenses'
