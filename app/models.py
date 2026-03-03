@@ -14,7 +14,7 @@ class License(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
-    metadata = db.Column(db.Text, default='{}')
+    license_metadata = db.Column(db.Text, default='{}')
     
     activations = db.relationship('Activation', backref='license', lazy='dynamic')
 
