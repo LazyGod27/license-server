@@ -1,4 +1,4 @@
-from flask import request, jsonify, current_app
+from flask import request, jsonify, current_app, send_from_directory
 from .models import License, Activation, AuditLog
 from datetime import datetime
 from . import db
@@ -81,7 +81,7 @@ def register_routes(app):
         return jsonify({
             'valid': True,
             'token': token,
-            'features': json.loads(license.metadata or '{}'),
+            'features': json.loads(license.license_metadata or '{}'),
             'expires_at': license.expires_at.isoformat()
         })
     
@@ -119,7 +119,7 @@ def register_routes(app):
             product_id=data.get('product_id', 'GREED-TOOL'),
             max_activations=data.get('max_activations', 1),
             expires_at=expires_at,
-            metadata=json.dumps(data.get('features', {}))
+            license_metadata=json.dumps(data.get('features', {}))
         )
         
         db.session.add(license)
@@ -140,3 +140,51 @@ def register_routes(app):
         }
         
         return jsonify(stats)
+    
+    @app.route('/admin/api/licenses/<license_key>/revoke', methods=['POST'])
+    def revoke_license(license_key):
+        """Revoke a license so it can't be used anymore"""
+        api_key = request.headers.get('X-API-Key')
+        if api_key != app.config['ADMIN_API_KEY']:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        license = License.query.filter_by(license_key=license_key).first()
+        if not license:
+            return jsonify({'error': 'License not found'}), 404
+        
+        # Mark as inactive
+        license.is_active = False
+        
+        # Also revoke all activations
+        for activation in license.activations:
+            activation.is_revoked = True
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'License revoked'})
+    
+    @app.route('/admin/api/licenses', methods=['GET'])
+    def list_licenses():
+        """Get all licenses for admin panel"""
+        api_key = request.headers.get('X-API-Key')
+        if api_key != app.config['ADMIN_API_KEY']:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        licenses = License.query.all()
+        result = []
+        for lic in licenses:
+            result.append({
+                'license_key': lic.license_key,
+                'product_id': lic.product_id,
+                'max_activations': lic.max_activations,
+                'expires_at': lic.expires_at.isoformat(),
+                'is_active': lic.is_active,
+                'activation_count': lic.activations.filter_by(is_revoked=False).count()
+            })
+        
+        return jsonify({'licenses': result})
+    
+    @app.route('/admin')
+    def admin_panel():
+        """Serve the admin UI"""
+        return send_from_directory('templates', 'admin.html')
