@@ -81,7 +81,7 @@ def register_routes(app):
         return jsonify({
             'valid': True,
             'token': token,
-            'features': json.loads(license.metadata or '{}'),
+            'features': json.loads(license.license_metadata or '{}'),
             'expires_at': license.expires_at.isoformat()
         })
     
