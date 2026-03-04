@@ -12,7 +12,7 @@ from functools import wraps
 
 def register_routes(app):
 
-        # SIMPLE HOME PAGE - THIS FIXES THE 502 ERROR!
+    # SIMPLE HOME PAGE - THIS FIXES THE 502 ERROR!
     @app.route('/')
     def home():
         return {"status": "online", "message": "License Server Running"}
