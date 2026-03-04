@@ -1,1 +1,1 @@
-web: gunicorn "app:create_app()" --bind 0.0.0.0:5000
+web: gunicorn run:app --bind 0.0.0.0:8080 --log-level debug
