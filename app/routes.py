@@ -11,6 +11,11 @@ from cryptography.fernet import Fernet
 from functools import wraps
 
 def register_routes(app):
+
+        # SIMPLE HOME PAGE - THIS FIXES THE 502 ERROR!
+    @app.route('/')
+    def home():
+        return {"status": "online", "message": "License Server Running"}
     
     @app.route('/api/v1/verify', methods=['POST'])
     def verify_license():
