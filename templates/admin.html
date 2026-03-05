@@ -25,12 +25,12 @@
             <h2>Generate New License</h2>
             <input type="text" id="productId" placeholder="Product ID" value="GREED-TOOL">
             <input type="number" id="maxActivations" placeholder="Max Activations" value="1">
-            <select id="expiryDays">
-                <option value="30">30 Days</option>
-                <option value="90">90 Days</option>
-                <option value="365">1 Year</option>
-                <option value="730">2 Years</option>
+            <select id="expiryType">
+                <option value="hours">Hours</option>
+                <option value="days">Days</option>
+                <option value="permanent">Permanent (Year 9999)</option>
             </select>
+            <input type="number" id="expiryAmount" placeholder="Amount" value="1" min="1">
             <button onclick="generateLicense()">Generate License</button>
             <div id="newLicense" style="margin-top:10px; display:none;">
                 <strong>New License Key:</strong>
@@ -45,6 +45,7 @@
             <thead>
                 <tr>
                     <th>License Key</th>
+                    <th>Username</th>
                     <th>Product</th>
                     <th>Activations</th>
                     <th>Expires</th>
@@ -76,6 +77,9 @@
                 
                 // License Key
                 row.insertCell().textContent = lic.license_key;
+                
+                // Username
+                row.insertCell().textContent = lic.username || 'Unassigned';
                 
                 // Product
                 row.insertCell().textContent = lic.product_id;
@@ -119,11 +123,20 @@
         async function generateLicense() {
             const productId = document.getElementById('productId').value;
             const maxActivations = document.getElementById('maxActivations').value;
-            const expiryDays = document.getElementById('expiryDays').value;
+            const expiryType = document.getElementById('expiryType').value;
+            const expiryAmount = document.getElementById('expiryAmount').value;
             
             // Calculate expiry date
             const expires = new Date();
-            expires.setDate(expires.getDate() + parseInt(expiryDays));
+            
+            if (expiryType === 'hours') {
+                expires.setHours(expires.getHours() + parseInt(expiryAmount));
+            } else if (expiryType === 'days') {
+                expires.setDate(expires.getDate() + parseInt(expiryAmount));
+            } else if (expiryType === 'permanent') {
+                // Set to year 9999 for "permanent" licenses
+                expires.setFullYear(9999, 11, 31); // December 31, 9999
+            }
             
             const response = await fetch('/admin/api/licenses', {
                 method: 'POST',

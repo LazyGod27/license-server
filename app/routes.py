@@ -26,7 +26,15 @@ def register_routes(app):
             return jsonify({'error': 'No data provided'}), 400
         
         license_key = data.get('license_key')
+        username = data.get('username')  # New field
         hardware_data = data.get('hardware_data', {})
+        
+        # Validate username (3-20 chars, alphanumeric)
+        if username:
+            if len(username) < 3 or len(username) > 20:
+                return jsonify({'error': 'Username must be 3-20 characters'}), 400
+            if not username.isalnum():
+                return jsonify({'error': 'Username can only contain letters and numbers'}), 400
         
         # Find license
         license = License.query.filter_by(license_key=license_key).first()
@@ -53,6 +61,11 @@ def register_routes(app):
             if activation.is_revoked:
                 return jsonify({'error': 'Activation revoked'}), 401
             activation.last_seen = datetime.utcnow()
+            
+            # If license is active, username shouldn't change
+            if license.username and license.username != username:
+                return jsonify({'error': 'License already assigned to different user'}), 401
+                
         else:
             # Check max activations
             current_count = Activation.query.filter_by(
@@ -69,19 +82,25 @@ def register_routes(app):
                 ip_address=request.remote_addr
             )
             db.session.add(activation)
+            
+            # First activation - set username
+            if not license.username:
+                license.username = username
+        
+        db.session.commit()
         
         # Generate token
         token = jwt.encode({
             'license': license_key,
+            'username': license.username,
             'hwid': hardware_id,
             'exp': datetime.utcnow().timestamp() + 86400
         }, app.config['JWT_SECRET'], algorithm='HS256')
         
-        db.session.commit()
-        
         return jsonify({
             'valid': True,
             'token': token,
+            'username': license.username,
             'features': json.loads(license.license_metadata or '{}'),
             'expires_at': license.expires_at.isoformat()
         })
@@ -180,6 +199,7 @@ def register_routes(app):
                 'max_activations': lic.max_activations,
                 'expires_at': lic.expires_at.isoformat(),
                 'is_active': lic.is_active,
+                'username': lic.username,
                 'activation_count': lic.activations.filter_by(is_revoked=False).count()
             })
         
