@@ -21,13 +21,13 @@ def register_routes(app):
         return {"status": "online", "message": "License Server Running"}
     
     @app.route('/api/v1/verify', methods=['POST'])
-    # @rate_limit(max_requests=10, window_seconds=60)  # Temporarily disabled
+    @rate_limit(max_requests=10, window_seconds=60)  # RE-ENABLE RATE LIMITING
     def verify_license():
-        # Security checks - TEMPORARILY DISABLED FOR TESTING
-        # security_valid, security_error = security_check()
-        # if not security_valid:
-        #     log_security_event('SECURITY_BLOCK', security_error, 'WARNING')
-        #     return jsonify({'error': security_error}), 400
+        # Security checks - RE-ENABLE GRADUALLY
+        security_valid, security_error = security_check()
+        if not security_valid:
+            log_security_event('SECURITY_BLOCK', security_error, 'WARNING')
+            return jsonify({'error': security_error}), 400
         
         # Detect automation - TEMPORARILY DISABLED FOR TESTING
         # is_automation, automation_reason = detect_automation()
@@ -40,41 +40,41 @@ def register_routes(app):
         if not data:
             return jsonify({'error': 'No data provided'}), 400
         
-        # TEMPORARILY FORCE OLD FORMAT FOR TESTING
-        # if is_new_format(data):
-        #     # New encrypted format
-        #     try:
-        #         # Verify signature first
-        #         json_str = json.dumps({k: v for k, v in data.items() if k != 'sig'})
-        #         if not verify_signature(json_str, data.get('sig', '')):
-        #             log_security_event('INVALID_SIGNATURE', f'IP: {request.remote_addr}', 'WARNING')
-        #             return jsonify({'error': 'Invalid signature'}), 401
-        #         
-        #         # Get hardware data first for key generation
-        #         hardware_data = data.get('h', {})
-        #         hwid_string = f"{hardware_data.get('c', '')}|{hardware_data.get('m', '')}"
-        #         hardware_id = hashlib.sha256(hwid_string.encode()).hexdigest()
-        #         
-        #         # Decrypt sensitive data with hardware-specific key
-        #         license_key = decrypt_data(data.get('d', ''), hardware_id)
-        #         username = decrypt_data(data.get('u', ''), hardware_id) if data.get('u') else ''
-        #         
-        #         # Verify session token (basic check)
-        #         session_token = data.get('s', '')
-        #         if not session_token:
-        #             return jsonify({'error': 'Missing session token'}), 400
-        #         
-        #         log_security_event('ENCRYPTED_REQUEST', f'License: {license_key[:8]}...', 'INFO')
-        #         
-        #     except Exception as e:
-        #         log_security_event('DECRYPTION_FAILED', str(e), 'ERROR')
-        #         return jsonify({'error': f'Decryption failed: {str(e)}'}), 400
-        # else:
-        # Old format for backward compatibility
-        license_key = data.get('license_key')
-        username = data.get('username', '')
-        hardware_data = data.get('hardware_data', {})
-        # log_security_event('LEGACY_REQUEST', f'License: {license_key[:8]}...', 'INFO')
+        # Check if using new encrypted format - RE-ENABLE NEW FORMAT
+        if is_new_format(data):
+            # New encrypted format
+            try:
+                # Verify signature first
+                json_str = json.dumps({k: v for k, v in data.items() if k != 'sig'})
+                if not verify_signature(json_str, data.get('sig', '')):
+                    log_security_event('INVALID_SIGNATURE', f'IP: {request.remote_addr}', 'WARNING')
+                    return jsonify({'error': 'Invalid signature'}), 401
+                
+                # Get hardware data first for key generation
+                hardware_data = data.get('h', {})
+                hwid_string = f"{hardware_data.get('c', '')}|{hardware_data.get('m', '')}"
+                hardware_id = hashlib.sha256(hwid_string.encode()).hexdigest()
+                
+                # Decrypt sensitive data with hardware-specific key
+                license_key = decrypt_data(data.get('d', ''), hardware_id)
+                username = decrypt_data(data.get('u', ''), hardware_id) if data.get('u') else ''
+                
+                # Verify session token (basic check)
+                session_token = data.get('s', '')
+                if not session_token:
+                    return jsonify({'error': 'Missing session token'}), 400
+                
+                log_security_event('ENCRYPTED_REQUEST', f'License: {license_key[:8]}...', 'INFO')
+                
+            except Exception as e:
+                log_security_event('DECRYPTION_FAILED', str(e), 'ERROR')
+                return jsonify({'error': f'Decryption failed: {str(e)}'}), 400
+        else:
+            # Old format for backward compatibility
+            license_key = data.get('license_key')
+            username = data.get('username', '')
+            hardware_data = data.get('hardware_data', {})
+            log_security_event('LEGACY_REQUEST', f'License: {license_key[:8]}...', 'INFO')
         
         # Validate username (3-20 chars, alphanumeric)
         if username:
