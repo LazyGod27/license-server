@@ -50,12 +50,14 @@ def register_routes(app):
                     log_security_event('INVALID_SIGNATURE', f'IP: {request.remote_addr}', 'WARNING')
                     return jsonify({'error': 'Invalid signature'}), 401
                 
-                # Decrypt sensitive data
-                license_key = decrypt_data(data.get('d', ''))
-                username = decrypt_data(data.get('u', '')) if data.get('u') else ''
-                
-                # Get hardware data (not encrypted)
+                # Get hardware data first for key generation
                 hardware_data = data.get('h', {})
+                hwid_string = f"{hardware_data.get('c', '')}|{hardware_data.get('m', '')}"
+                hardware_id = hashlib.sha256(hwid_string.encode()).hexdigest()
+                
+                # Decrypt sensitive data with hardware-specific key
+                license_key = decrypt_data(data.get('d', ''), hardware_id)
+                username = decrypt_data(data.get('u', ''), hardware_id) if data.get('u') else ''
                 
                 # Verify session token (basic check)
                 session_token = data.get('s', '')

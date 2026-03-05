@@ -6,19 +6,15 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 import base64
 
-def generate_encryption_key():
+def generate_encryption_key(hardware_id=""):
     """Generate encryption key similar to client implementation"""
-    # Use server-side seed + time for key generation
-    server_seed = "GREEDTOOL_SERVER_V2"
-    time_seed = str(int(time.time()))
-    hw_seed = server_seed + time_seed
-    
-    # Generate hash similar to client
-    hash_obj = hashlib.sha256(hw_seed.encode()).digest()
+    # Use deterministic seed that matches client's approach
+    client_seed = "GREEDTOOL_CLIENT_V2" + hardware_id
+    hash_obj = hashlib.sha256(client_seed.encode()).digest()
     key = bytes(b ^ 0x5A for b in hash_obj[:32])
     return key
 
-def decrypt_data(encrypted_data):
+def decrypt_data(encrypted_data, hardware_id=""):
     """Decrypt data from client"""
     if not encrypted_data:
         return encrypted_data
@@ -40,7 +36,7 @@ def decrypt_data(encrypted_data):
                 encrypted_bytes = encrypted_bytes[:-padding_size]
         
         # Generate key and decrypt
-        key = generate_encryption_key()
+        key = generate_encryption_key(hardware_id)
         data = bytearray(encrypted_bytes)
         
         # Reverse encryption rounds (3 rounds)

@@ -3,16 +3,18 @@ import hashlib
 import secrets
 from functools import wraps
 from flask import request, jsonify
-import redis
 import os
 
-# Rate limiting with Redis (if available)
+# Rate limiting with in-memory fallback (Redis optional)
 try:
+    import redis
     r = redis.Redis(host=os.getenv('REDIS_HOST', 'localhost'), port=6379, db=0, decode_responses=True)
     r.ping()
     REDIS_AVAILABLE = True
 except:
     REDIS_AVAILABLE = False
+    # In-memory rate limiting fallback
+    rate_limit_store = {}
 
 # Rate limiting
 def rate_limit(max_requests=10, window_seconds=60):
@@ -20,10 +22,11 @@ def rate_limit(max_requests=10, window_seconds=60):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
+            client_ip = request.remote_addr
+            
             if REDIS_AVAILABLE:
-                client_ip = request.remote_addr
+                # Redis implementation
                 key = f"rate_limit:{client_ip}"
-                
                 try:
                     current_requests = r.incr(key)
                     if current_requests == 1:
@@ -33,6 +36,35 @@ def rate_limit(max_requests=10, window_seconds=60):
                         return jsonify({'error': 'Rate limit exceeded'}), 429
                 except:
                     pass  # If Redis fails, allow request
+            else:
+                # In-memory fallback implementation
+                import time
+                current_time = time.time()
+                
+                # Clean up old entries
+                expired_keys = []
+                for key, (count, timestamp) in rate_limit_store.items():
+                    if current_time - timestamp > window_seconds:
+                        expired_keys.append(key)
+                
+                for key in expired_keys:
+                    del rate_limit_store[key]
+                
+                # Check current rate
+                ip_key = f"rate_limit:{client_ip}"
+                if ip_key in rate_limit_store:
+                    count, timestamp = rate_limit_store[ip_key]
+                    if current_time - timestamp < window_seconds:
+                        if count >= max_requests:
+                            return jsonify({'error': 'Rate limit exceeded'}), 429
+                        # Increment count
+                        rate_limit_store[ip_key] = (count + 1, timestamp)
+                    else:
+                        # Reset window
+                        rate_limit_store[ip_key] = (1, current_time)
+                else:
+                    # First request
+                    rate_limit_store[ip_key] = (1, current_time)
             
             return f(*args, **kwargs)
         return decorated_function
