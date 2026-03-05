@@ -9,6 +9,7 @@ import hmac
 import jwt
 from cryptography.fernet import Fernet
 from functools import wraps
+import os
 
 def register_routes(app):
 
@@ -187,4 +188,6 @@ def register_routes(app):
     @app.route('/admin')
     def admin_panel():
         """Serve the admin UI"""
-        return send_from_directory('templates', 'admin.html')
+        # Get the absolute path to templates directory
+        template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates')
+        return send_from_directory(template_dir, 'admin.html')
