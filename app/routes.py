@@ -10,6 +10,8 @@ import jwt
 from cryptography.fernet import Fernet
 from functools import wraps
 import os
+from .crypto_utils import decrypt_data, verify_signature, is_new_format
+from .security import security_check, rate_limit, log_security_event, detect_automation
 
 def register_routes(app):
 
@@ -19,15 +21,58 @@ def register_routes(app):
         return {"status": "online", "message": "License Server Running"}
     
     @app.route('/api/v1/verify', methods=['POST'])
+    @rate_limit(max_requests=10, window_seconds=60)
     def verify_license():
+        # Security checks
+        security_valid, security_error = security_check()
+        if not security_valid:
+            log_security_event('SECURITY_BLOCK', security_error, 'WARNING')
+            return jsonify({'error': security_error}), 400
+        
+        # Detect automation
+        is_automation, automation_reason = detect_automation()
+        if is_automation:
+            log_security_event('AUTOMATION_DETECTED', automation_reason, 'WARNING')
+            # Don't block immediately, but log for monitoring
+        
         data = request.get_json()
         
         if not data:
             return jsonify({'error': 'No data provided'}), 400
         
-        license_key = data.get('license_key')
-        username = data.get('username')  # New field
-        hardware_data = data.get('hardware_data', {})
+        # Check if using new encrypted format
+        if is_new_format(data):
+            # New encrypted format
+            try:
+                # Verify signature first
+                json_str = json.dumps({k: v for k, v in data.items() if k != 'sig'})
+                if not verify_signature(json_str, data.get('sig', '')):
+                    log_security_event('INVALID_SIGNATURE', f'IP: {request.remote_addr}', 'WARNING')
+                    return jsonify({'error': 'Invalid signature'}), 401
+                
+                # Decrypt sensitive data
+                license_key = decrypt_data(data.get('d', ''))
+                username = decrypt_data(data.get('u', '')) if data.get('u') else ''
+                
+                # Get hardware data (not encrypted)
+                hardware_data = data.get('h', {})
+                
+                # Verify session token (basic check)
+                session_token = data.get('s', '')
+                if not session_token:
+                    return jsonify({'error': 'Missing session token'}), 400
+                
+                log_security_event('ENCRYPTED_REQUEST', f'License: {license_key[:8]}...', 'INFO')
+                
+            except Exception as e:
+                log_security_event('DECRYPTION_FAILED', str(e), 'ERROR')
+                return jsonify({'error': f'Decryption failed: {str(e)}'}), 400
+        else:
+            # Old format for backward compatibility
+            license_key = data.get('license_key')
+            username = data.get('username', '')
+            hardware_data = data.get('hardware_data', {})
+            log_security_event('LEGACY_REQUEST', f'License: {license_key[:8]}...', 'INFO')
         
         # Validate username (3-20 chars, alphanumeric)
         if username:
@@ -39,16 +84,19 @@ def register_routes(app):
         # Find license
         license = License.query.filter_by(license_key=license_key).first()
         if not license:
+            log_security_event('INVALID_LICENSE', f'Key: {license_key}', 'WARNING')
             return jsonify({'error': 'Invalid license'}), 401
         
         if not license.is_active:
+            log_security_event('DEACTIVATED_LICENSE', f'License: {license_key}', 'WARNING')
             return jsonify({'error': 'License deactivated'}), 401
         
         if datetime.utcnow() > license.expires_at:
+            log_security_event('EXPIRED_LICENSE', f'License: {license_key}', 'WARNING')
             return jsonify({'error': 'License expired'}), 401
         
         # Generate hardware ID
-        hwid_string = f"{hardware_data.get('cpu_id', '')}|{hardware_data.get('mac', '')}"
+        hwid_string = f"{hardware_data.get('c', '')}|{hardware_data.get('m', '')}"
         hardware_id = hashlib.sha256(hwid_string.encode()).hexdigest()
         
         # Check activation
@@ -59,6 +107,7 @@ def register_routes(app):
         
         if activation:
             if activation.is_revoked:
+                log_security_event('REVOKED_ACTIVATION', f'License: {license_key}', 'WARNING')
                 return jsonify({'error': 'Activation revoked'}), 401
             activation.last_seen = datetime.utcnow()
             
@@ -74,6 +123,7 @@ def register_routes(app):
             ).count()
             
             if current_count >= license.max_activations:
+                log_security_event('MAX_ACTIVATIONS', f'License: {license_key}', 'WARNING')
                 return jsonify({'error': 'Maximum activations reached'}), 401
             
             activation = Activation(
@@ -96,6 +146,8 @@ def register_routes(app):
             'hwid': hardware_id,
             'exp': datetime.utcnow().timestamp() + 86400
         }, app.config['JWT_SECRET'], algorithm='HS256')
+        
+        log_security_event('SUCCESSFUL_VERIFICATION', f'License: {license_key}', 'INFO')
         
         return jsonify({
             'valid': True,
