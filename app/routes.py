@@ -97,8 +97,13 @@ def register_routes(app):
             log_security_event('EXPIRED_LICENSE', f'License: {license_key}', 'WARNING')
             return jsonify({'error': 'License expired'}), 401
         
-        # Generate hardware ID
-        hwid_string = f"{hardware_data.get('c', '')}|{hardware_data.get('m', '')}"
+        # Generate hardware ID - FIX FOR OLD FORMAT
+        if isinstance(hardware_data, str):
+            # Old format: hardware_data is a string
+            hwid_string = hardware_data
+        else:
+            # New format: hardware_data is a dict
+            hwid_string = f"{hardware_data.get('c', '')}|{hardware_data.get('m', '')}"
         hardware_id = hashlib.sha256(hwid_string.encode()).hexdigest()
         
         # Check activation
