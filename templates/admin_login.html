@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Login - License Server</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .login-header h1 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 28px;
+        }
+        .login-header p {
+            color: #7f8c8d;
+            margin: 10px 0 0 0;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .login-btn:hover {
+            transform: translateY(-2px);
+        }
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .error-message {
+            background: #e74c3c;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .success-message {
+            background: #27ae60;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .security-note {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>🔑 Admin Access</h1>
+            <p>License Server Management</p>
+        </div>
+        
+        <div class="error-message" id="errorMessage">
+            Invalid credentials. Please try again.
+        </div>
+        
+        <div class="warning-message" id="warningMessage" style="background: #f39c12; color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px; display: none;">
+            Too many failed attempts. Please wait before trying again.
+        </div>
+        
+        <div class="success-message" id="successMessage">
+            Login successful! Redirecting...
+        </div>
+        
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autocomplete="username">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+            
+            <button type="submit" class="login-btn" id="loginBtn">
+                Sign In
+            </button>
+        </form>
+        
+        <div class="security-note">
+            🔒 This is a secure admin area. Unauthorized access is prohibited.
+        </div>
+    </div>
+    
+    <script>
+        // Check if already logged in
+        if (sessionStorage.getItem('adminAuthenticated') === 'true') {
+            window.location.href = '/admin/dashboard';
+        }
+        
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const errorMessage = document.getElementById('errorMessage');
+            const warningMessage = document.getElementById('warningMessage');
+            const successMessage = document.getElementById('successMessage');
+            
+            // Hide previous messages
+            errorMessage.style.display = 'none';
+            warningMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+            
+            // Disable button during login
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Signing in...';
+            
+            try {
+                const response = await fetch('/admin/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Store authentication
+                    sessionStorage.setItem('adminAuthenticated', 'true');
+                    sessionStorage.setItem('adminToken', data.token);
+                    
+                    // Show success message
+                    successMessage.style.display = 'block';
+                    
+                    // Redirect after delay
+                    setTimeout(() => {
+                        window.location.href = '/admin/dashboard';
+                    }, 1000);
+                } else if (response.status === 429) {
+                    // Rate limited - too many attempts
+                    warningMessage.textContent = data.error || 'Too many failed attempts. Please wait before trying again.';
+                    warningMessage.style.display = 'block';
+                    
+                    // Clear password field
+                    document.getElementById('password').value = '';
+                } else {
+                    // Show error message with remaining attempts
+                    let errorMsg = data.error || 'Login failed';
+                    if (data.remaining_attempts !== undefined) {
+                        errorMsg += ` (${data.remaining_attempts} attempts remaining)`;
+                    }
+                    errorMessage.textContent = errorMsg;
+                    errorMessage.style.display = 'block';
+                    
+                    // Clear password field
+                    document.getElementById('password').value = '';
+                }
+            } catch (error) {
+                errorMessage.textContent = 'Network error. Please try again.';
+                errorMessage.style.display = 'block';
+            } finally {
+                // Re-enable button
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In';
+            }
+        }
+    </script>
+</body>
+</html>

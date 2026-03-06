@@ -22,7 +22,10 @@
 </head>
 <body>
     <div class="container">
-        <h1>🔑 License Server Administration</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h1>🔑 License Server Administration</h1>
+            <button onclick="logout()" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">Logout</button>
+        </div>
         
         <!-- Generate License Form -->
         <div class="generate-form">
@@ -130,131 +133,144 @@
     </div>
     
     <script>
-        // UPDATE THIS: Replace with your actual ADMIN_API_KEY from .env file
-        const API_KEY = '5ZfR2Vn8QmL3YpJ6HsT4Wc9KdX0Ea';
+        // Check authentication on page load
+        if (!sessionStorage.getItem('adminAuthenticated') || sessionStorage.getItem('adminAuthenticated') !== 'true') {
+            window.location.href = '/admin';
+        }
         
         async function loadLicenses() {
-            const response = await fetch('/admin/api/licenses', {
-                headers: { 'X-API-Key': API_KEY }
-            });
-            const data = await response.json();
-            
-            // Clear all tables
-            document.getElementById('unassignedBody').innerHTML = '';
-            document.getElementById('assignedBody').innerHTML = '';
-            document.getElementById('expiredBody').innerHTML = '';
-            document.getElementById('revokedBody').innerHTML = '';
-            
-            data.licenses.forEach(lic => {
-                const isExpired = new Date(lic.expires_at) < new Date();
-                const hasActivations = lic.activation_count > 0;
-                const isAssigned = lic.username && lic.username !== 'Unassigned';
-                
-                // Determine which table this license belongs to
-                let targetTable, targetBody;
-                if (!lic.is_active) {
-                    targetTable = 'revoked';
-                    targetBody = document.getElementById('revokedBody');
-                } else if (isExpired) {
-                    targetTable = 'expired';
-                    targetBody = document.getElementById('expiredBody');
-                } else if (!isAssigned && !hasActivations) {
-                    targetTable = 'unassigned';
-                    targetBody = document.getElementById('unassignedBody');
-                } else {
-                    targetTable = 'assigned';
-                    targetBody = document.getElementById('assignedBody');
+            try {
+                const response = await fetch('/admin/api/licenses');
+                if (response.status === 401) {
+                    // Authentication required, redirect to login
+                    sessionStorage.removeItem('adminAuthenticated');
+                    sessionStorage.removeItem('adminToken');
+                    window.location.href = '/admin';
+                    return;
                 }
                 
-                const row = targetBody.insertRow();
+                const data = await response.json();
                 
-                // License Key
-                row.insertCell().textContent = lic.license_key;
+                // Clear all tables
+                document.getElementById('unassignedBody').innerHTML = '';
+                document.getElementById('assignedBody').innerHTML = '';
+                document.getElementById('expiredBody').innerHTML = '';
+                document.getElementById('revokedBody').innerHTML = '';
                 
-                // Username
-                row.insertCell().textContent = lic.username || 'Unassigned';
-                
-                // Product
-                row.insertCell().textContent = lic.product_id;
-                
-                // Additional columns for assigned and expired tables
-                if (targetTable === 'assigned' || targetTable === 'expired') {
-                    // IP Address
-                    const ipCell = row.insertCell();
-                    if (lic.activations && lic.activations.length > 0) {
-                        ipCell.textContent = lic.activations.map(a => a.ip_address || 'Unknown').join(', ');
+                data.licenses.forEach(lic => {
+                    const isExpired = new Date(lic.expires_at) < new Date();
+                    const hasActivations = lic.activation_count > 0;
+                    const isAssigned = lic.username && lic.username !== 'Unassigned';
+                    
+                    // Determine which table this license belongs to
+                    let targetTable, targetBody;
+                    if (!lic.is_active) {
+                        targetTable = 'revoked';
+                        targetBody = document.getElementById('revokedBody');
+                    } else if (isExpired) {
+                        targetTable = 'expired';
+                        targetBody = document.getElementById('expiredBody');
+                    } else if (!isAssigned && !hasActivations) {
+                        targetTable = 'unassigned';
+                        targetBody = document.getElementById('unassignedBody');
                     } else {
-                        ipCell.textContent = 'Unknown';
+                        targetTable = 'assigned';
+                        targetBody = document.getElementById('assignedBody');
                     }
                     
-                    // Last Seen
-                    const lastSeenCell = row.insertCell();
-                    if (lic.activations && lic.activations.length > 0) {
-                        const lastSeen = new Date(lic.activations[0].last_seen);
-                        // Convert to local time and format properly
-                        const localTime = new Date(lastSeen.getTime() - lastSeen.getTimezoneOffset() * 60000);
-                        lastSeenCell.textContent = localTime.toLocaleString();
-                    } else {
-                        lastSeenCell.textContent = 'Never';
+                    const row = targetBody.insertRow();
+                    
+                    // License Key
+                    row.insertCell().textContent = lic.license_key;
+                    
+                    // Username
+                    row.insertCell().textContent = lic.username || 'Unassigned';
+                    
+                    // Product
+                    row.insertCell().textContent = lic.product_id;
+                    
+                    // Additional columns for assigned and expired tables
+                    if (targetTable === 'assigned' || targetTable === 'expired') {
+                        // IP Address
+                        const ipCell = row.insertCell();
+                        if (lic.activations && lic.activations.length > 0) {
+                            ipCell.textContent = lic.activations.map(a => a.ip_address || 'Unknown').join(', ');
+                        } else {
+                            ipCell.textContent = 'Unknown';
+                        }
+                        
+                        // Last Seen
+                        const lastSeenCell = row.insertCell();
+                        if (lic.activations && lic.activations.length > 0) {
+                            const lastSeen = new Date(lic.activations[0].last_seen);
+                            // Convert to local time and format properly
+                            const localTime = new Date(lastSeen.getTime() - lastSeen.getTimezoneOffset() * 60000);
+                            lastSeenCell.textContent = localTime.toLocaleString();
+                        } else {
+                            lastSeenCell.textContent = 'Never';
+                        }
                     }
-                }
-                
-                // Activations
-                row.insertCell().textContent = `${lic.activation_count}/${lic.max_activations}`;
-                
-                // Expires
-                const expiryDate = new Date(lic.expires_at);
-                row.insertCell().textContent = expiryDate.toLocaleDateString();
-                
-                // Status
-                const statusCell = row.insertCell();
-                if (!lic.is_active) {
-                    statusCell.textContent = 'REVOKED';
-                    statusCell.className = 'revoked';
-                } else if (isExpired) {
-                    statusCell.textContent = 'EXPIRED';
-                    statusCell.className = 'expired';
-                } else if (!isAssigned && !hasActivations) {
-                    statusCell.textContent = 'UNASSIGNED';
-                    statusCell.className = 'unassigned';
-                } else {
-                    statusCell.textContent = 'ACTIVE';
-                    statusCell.className = 'valid';
-                }
-                
-                // Actions
-                const actionsCell = row.insertCell();
-                if (targetTable === 'revoked') {
-                    // Delete button for revoked licenses
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.textContent = 'Delete';
-                    deleteBtn.className = 'delete-btn';
-                    deleteBtn.onclick = () => deleteLicense(lic.license_key);
-                    actionsCell.appendChild(deleteBtn);
-                } else if (targetTable === 'expired') {
-                    // Revoke button for expired licenses (to clean up)
-                    const revokeBtn = document.createElement('button');
-                    revokeBtn.textContent = 'Revoke';
-                    revokeBtn.style.background = '#e67e22';
-                    revokeBtn.style.color = 'white';
-                    revokeBtn.style.border = 'none';
-                    revokeBtn.style.padding = '5px 10px';
-                    revokeBtn.style.cursor = 'pointer';
-                    revokeBtn.onclick = () => revokeLicense(lic.license_key);
-                    actionsCell.appendChild(revokeBtn);
-                } else if (lic.is_active && !isExpired) {
-                    // Revoke button for active licenses
-                    const revokeBtn = document.createElement('button');
-                    revokeBtn.textContent = 'Revoke';
-                    revokeBtn.style.background = '#e74c3c';
-                    revokeBtn.style.color = 'white';
-                    revokeBtn.style.border = 'none';
-                    revokeBtn.style.padding = '5px 10px';
-                    revokeBtn.style.cursor = 'pointer';
-                    revokeBtn.onclick = () => revokeLicense(lic.license_key);
-                    actionsCell.appendChild(revokeBtn);
-                }
-            });
+                    
+                    // Activations
+                    row.insertCell().textContent = `${lic.activation_count}/${lic.max_activations}`;
+                    
+                    // Expires
+                    const expiryDate = new Date(lic.expires_at);
+                    row.insertCell().textContent = expiryDate.toLocaleDateString();
+                    
+                    // Status
+                    const statusCell = row.insertCell();
+                    if (!lic.is_active) {
+                        statusCell.textContent = 'REVOKED';
+                        statusCell.className = 'revoked';
+                    } else if (isExpired) {
+                        statusCell.textContent = 'EXPIRED';
+                        statusCell.className = 'expired';
+                    } else if (!isAssigned && !hasActivations) {
+                        statusCell.textContent = 'UNASSIGNED';
+                        statusCell.className = 'unassigned';
+                    } else {
+                        statusCell.textContent = 'ACTIVE';
+                        statusCell.className = 'valid';
+                    }
+                    
+                    // Actions
+                    const actionsCell = row.insertCell();
+                    if (targetTable === 'revoked') {
+                        // Delete button for revoked licenses
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = 'Delete';
+                        deleteBtn.className = 'delete-btn';
+                        deleteBtn.onclick = () => deleteLicense(lic.license_key);
+                        actionsCell.appendChild(deleteBtn);
+                    } else if (targetTable === 'expired') {
+                        // Revoke button for expired licenses (to clean up)
+                        const revokeBtn = document.createElement('button');
+                        revokeBtn.textContent = 'Revoke';
+                        revokeBtn.style.background = '#e67e22';
+                        revokeBtn.style.color = 'white';
+                        revokeBtn.style.border = 'none';
+                        revokeBtn.style.padding = '5px 10px';
+                        revokeBtn.style.cursor = 'pointer';
+                        revokeBtn.onclick = () => revokeLicense(lic.license_key);
+                        actionsCell.appendChild(revokeBtn);
+                    } else if (lic.is_active && !isExpired) {
+                        // Revoke button for active licenses
+                        const revokeBtn = document.createElement('button');
+                        revokeBtn.textContent = 'Revoke';
+                        revokeBtn.style.background = '#e74c3c';
+                        revokeBtn.style.color = 'white';
+                        revokeBtn.style.border = 'none';
+                        revokeBtn.style.padding = '5px 10px';
+                        revokeBtn.style.cursor = 'pointer';
+                        revokeBtn.onclick = () => revokeLicense(lic.license_key);
+                        actionsCell.appendChild(revokeBtn);
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading licenses:', error);
+                alert('Error loading licenses. Please try again.');
+            }
         }
         
         async function generateLicense() {
@@ -275,37 +291,57 @@
                 expires.setFullYear(9999, 11, 31); // December 31, 9999
             }
             
-            const response = await fetch('/admin/api/licenses', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': API_KEY
-                },
-                body: JSON.stringify({
-                    product_id: productId,
-                    max_activations: parseInt(maxActivations),
-                    expires_at: expires.toISOString().split('T')[0],
-                    features: { "arena_reset": true, "lobby": true }
-                })
-            });
-            
-            const data = await response.json();
-            document.getElementById('licenseKeyOutput').value = data.license_key;
-            document.getElementById('newLicense').style.display = 'block';
-            
-            // Reload table
-            loadLicenses();
+            try {
+                const response = await fetch('/admin/api/licenses', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        product_id: productId,
+                        max_activations: parseInt(maxActivations),
+                        expires_at: expires.toISOString().split('T')[0],
+                        features: { "arena_reset": true, "lobby": true }
+                    })
+                });
+                
+                if (response.status === 401) {
+                    sessionStorage.removeItem('adminAuthenticated');
+                    sessionStorage.removeItem('adminToken');
+                    window.location.href = '/admin';
+                    return;
+                }
+                
+                const data = await response.json();
+                document.getElementById('licenseKeyOutput').value = data.license_key;
+                document.getElementById('newLicense').style.display = 'block';
+                
+                // Reload table
+                loadLicenses();
+            } catch (error) {
+                alert('Error generating license. Please try again.');
+            }
         }
         
         async function revokeLicense(licenseKey) {
             if (!confirm(`Revoke license ${licenseKey}?`)) return;
             
-            await fetch(`/admin/api/licenses/${licenseKey}/revoke`, {
-                method: 'POST',
-                headers: { 'X-API-Key': API_KEY }
-            });
-            
-            loadLicenses();
+            try {
+                const response = await fetch(`/admin/api/licenses/${licenseKey}/revoke`, {
+                    method: 'POST'
+                });
+                
+                if (response.status === 401) {
+                    sessionStorage.removeItem('adminAuthenticated');
+                    sessionStorage.removeItem('adminToken');
+                    window.location.href = '/admin';
+                    return;
+                }
+                
+                loadLicenses();
+            } catch (error) {
+                alert('Error revoking license. Please try again.');
+            }
         }
         
         async function deleteLicense(licenseKey) {
@@ -313,9 +349,15 @@
             
             try {
                 const response = await fetch(`/admin/api/licenses/${licenseKey}/delete`, {
-                    method: 'DELETE',
-                    headers: { 'X-API-Key': API_KEY }
+                    method: 'DELETE'
                 });
+                
+                if (response.status === 401) {
+                    sessionStorage.removeItem('adminAuthenticated');
+                    sessionStorage.removeItem('adminToken');
+                    window.location.href = '/admin';
+                    return;
+                }
                 
                 const data = await response.json();
                 if (response.ok) {
@@ -327,6 +369,23 @@
             } catch (error) {
                 alert(`Error deleting license: ${error.message}`);
             }
+        }
+        
+        async function logout() {
+            try {
+                await fetch('/admin/api/logout', {
+                    method: 'POST'
+                });
+            } catch (error) {
+                console.log('Logout request failed, but clearing session anyway');
+            }
+            
+            // Clear session storage
+            sessionStorage.removeItem('adminAuthenticated');
+            sessionStorage.removeItem('adminToken');
+            
+            // Redirect to login
+            window.location.href = '/admin';
         }
         
         function copyLicense() {

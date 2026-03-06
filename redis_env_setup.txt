@@ -1,0 +1,30 @@
+# Redis Environment Variables for Railway
+# Add these to your Railway environment variables
+
+REDIS_HOST=your-redis-host.railway.app
+REDIS_PORT=6379
+REDIS_PASSWORD=your-redis-password
+
+# Example Railway Redis connection:
+# REDIS_HOST=redis.railway.app
+# REDIS_PORT=6379
+# REDIS_PASSWORD=your_generated_password
+
+# For local development (optional):
+# REDIS_HOST=localhost
+# REDIS_PORT=6379
+# REDIS_PASSWORD=
+
+# Notes:
+# 1. Get these values from your Railway Redis addon
+# 2. The password is usually generated automatically by Railway
+# 3. Host will be something like "sunny-redis.railway.app" 
+# 4. Port is typically 6379 for Redis
+# 5. If no password, leave REDIS_PASSWORD empty
+
+# How to add in Railway:
+# 1. Go to your project dashboard
+# 2. Click on your Redis addon
+# 3. Copy the connection details
+# 4. Go to project settings → Variables
+# 5. Add the three environment variables above
