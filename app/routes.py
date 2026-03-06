@@ -18,6 +18,11 @@ def register_routes(app):
 
     # Initialize Redis for brute force protection
     try:
+        # Debug: Print environment variables
+        print(f"🔍 DEBUG - REDIS_HOST: {os.getenv('REDIS_HOST', 'NOT_SET')}")
+        print(f"🔍 DEBUG - REDIS_PORT: {os.getenv('REDIS_PORT', 'NOT_SET')}")
+        print(f"🔍 DEBUG - REDIS_PASSWORD: {'SET' if os.getenv('REDIS_PASSWORD') else 'NOT_SET'}")
+        
         redis_client = redis.Redis(
             host=os.getenv('REDIS_HOST', 'localhost'),
             port=int(os.getenv('REDIS_PORT', 6379)),
