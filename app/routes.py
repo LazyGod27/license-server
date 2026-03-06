@@ -19,18 +19,28 @@ def register_routes(app):
     # Initialize Redis for brute force protection
     try:
         # Debug: Print environment variables
+        print(f"🔍 DEBUG - REDIS_URL: {os.getenv('REDIS_URL', 'NOT_SET')}")
         print(f"🔍 DEBUG - REDIS_HOST: {os.getenv('REDIS_HOST', 'NOT_SET')}")
         print(f"🔍 DEBUG - REDIS_PORT: {os.getenv('REDIS_PORT', 'NOT_SET')}")
         print(f"🔍 DEBUG - REDIS_PASSWORD: {'SET' if os.getenv('REDIS_PASSWORD') else 'NOT_SET'}")
         
-        redis_client = redis.Redis(
-            host=os.getenv('REDIS_HOST', 'localhost'),
-            port=int(os.getenv('REDIS_PORT', 6379)),
-            password=os.getenv('REDIS_PASSWORD'),
-            decode_responses=True,
-            socket_connect_timeout=5,
-            socket_timeout=5
-        )
+        # Try REDIS_URL first (Railway standard)
+        redis_url = os.getenv('REDIS_URL')
+        if redis_url:
+            print("🔗 Using REDIS_URL format")
+            redis_client = redis.from_url(redis_url, decode_responses=True)
+        else:
+            # Fallback to separate variables
+            print("🔧 Using separate Redis variables")
+            redis_client = redis.Redis(
+                host=os.getenv('REDIS_HOST', 'localhost'),
+                port=int(os.getenv('REDIS_PORT', 6379)),
+                password=os.getenv('REDIS_PASSWORD'),
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_timeout=5
+            )
+        
         # Test connection
         redis_client.ping()
         print("✅ Redis connected for brute force protection")
