@@ -474,35 +474,41 @@ def register_routes(app):
     @app.route('/admin/api/licenses', methods=['GET'])
     @admin_required
     def list_licenses():
-        """Get all licenses for admin panel"""
-        api_key = request.headers.get('X-API-Key')
-        if api_key != app.config['ADMIN_API_KEY']:
-            return jsonify({'error': 'Unauthorized'}), 401
-        
-        licenses = License.query.all()
-        result = []
-        for lic in licenses:
-            # Get activation details
-            activations = []
-            for activation in lic.activations.filter_by(is_revoked=False):
-                activations.append({
-                    'ip_address': activation.ip_address,
-                    'last_seen': activation.last_seen.isoformat() if activation.last_seen else None,
-                    'hardware_id': activation.hardware_id[:16] + '...'  # Shortened for display
+        """List all licenses with activation details"""
+        try:
+            print("🔍 DEBUG: list_licenses called - fetching licenses...")
+            licenses = License.query.all()
+            result = []
+            
+            for lic in licenses:
+                # Get activation details
+                activations = []
+                for activation in lic.activations:
+                    if not activation.is_revoked:
+                        activations.append({
+                            'hardware_id': activation.hardware_id,
+                            'ip_address': activation.ip_address,
+                            'last_seen': activation.last_seen.isoformat() if activation.last_seen else None
+                        })
+                
+                result.append({
+                    'license_key': lic.license_key,
+                    'username': lic.username or 'Unassigned',
+                    'product_id': lic.product_id,
+                    'max_activations': lic.max_activations,
+                    'activation_count': len([a for a in lic.activations if not a.is_revoked]),
+                    'expires_at': lic.expires_at.isoformat(),
+                    'is_active': lic.is_active,
+                    'activations': activations
                 })
             
-            result.append({
-                'license_key': lic.license_key,
-                'product_id': lic.product_id,
-                'max_activations': lic.max_activations,
-                'expires_at': lic.expires_at.isoformat(),
-                'is_active': lic.is_active,
-                'username': lic.username,
-                'activation_count': lic.activations.filter_by(is_revoked=False).count(),
-                'activations': activations
-            })
-        
-        return jsonify({'licenses': result})
+            print(f"🔍 DEBUG: Returning {len(result)} licenses")
+            return jsonify({'licenses': result})
+        except Exception as e:
+            print(f"🔍 ERROR in list_licenses: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': 'Failed to load licenses'}), 500
     
     @app.route('/admin')
     def admin_panel():
