@@ -242,6 +242,30 @@ def register_routes(app):
         
         return jsonify({'success': True, 'message': 'License revoked'})
     
+    @app.route('/admin/api/licenses/<license_key>/delete', methods=['DELETE'])
+    def delete_license(license_key):
+        """Delete a revoked license permanently"""
+        api_key = request.headers.get('X-API-Key')
+        if api_key != app.config['ADMIN_API_KEY']:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        license = License.query.filter_by(license_key=license_key).first()
+        if not license:
+            return jsonify({'error': 'License not found'}), 404
+        
+        # Only allow deletion of revoked licenses
+        if license.is_active:
+            return jsonify({'error': 'Cannot delete active license. Revoke it first.'}), 400
+        
+        # Delete all activations first
+        Activation.query.filter_by(license_id=license.id).delete()
+        
+        # Delete the license
+        db.session.delete(license)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'License deleted permanently'})
+    
     @app.route('/admin/api/licenses', methods=['GET'])
     def list_licenses():
         """Get all licenses for admin panel"""
@@ -252,6 +276,15 @@ def register_routes(app):
         licenses = License.query.all()
         result = []
         for lic in licenses:
+            # Get activation details
+            activations = []
+            for activation in lic.activations.filter_by(is_revoked=False):
+                activations.append({
+                    'ip_address': activation.ip_address,
+                    'last_seen': activation.last_seen.isoformat() if activation.last_seen else None,
+                    'hardware_id': activation.hardware_id[:16] + '...'  # Shortened for display
+                })
+            
             result.append({
                 'license_key': lic.license_key,
                 'product_id': lic.product_id,
@@ -259,7 +292,8 @@ def register_routes(app):
                 'expires_at': lic.expires_at.isoformat(),
                 'is_active': lic.is_active,
                 'username': lic.username,
-                'activation_count': lic.activations.filter_by(is_revoked=False).count()
+                'activation_count': lic.activations.filter_by(is_revoked=False).count(),
+                'activations': activations
             })
         
         return jsonify({'licenses': result})

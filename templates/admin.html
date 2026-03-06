@@ -11,7 +11,11 @@
         .valid { color: green; font-weight: bold; }
         .expired { color: red; }
         .revoked { color: gray; }
+        .unassigned { color: orange; }
         button { padding: 5px 10px; cursor: pointer; }
+        .delete-btn { background: #c0392b; color: white; border: none; padding: 5px 10px; cursor: pointer; }
+        .section { margin-bottom: 30px; }
+        .section h2 { border-bottom: 2px solid #3498db; padding-bottom: 5px; }
         .generate-form { background: #ecf0f1; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
         input, select { padding: 8px; margin: 5px; width: 200px; }
     </style>
@@ -39,24 +43,68 @@
             </div>
         </div>
         
-        <!-- Licenses Table -->
-        <h2>Active Licenses</h2>
-        <table id="licensesTable">
-            <thead>
-                <tr>
-                    <th>License Key</th>
-                    <th>Username</th>
-                    <th>Product</th>
-                    <th>Activations</th>
-                    <th>Expires</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="licensesBody">
-                <!-- Filled by JavaScript -->
-            </tbody>
-        </table>
+        <!-- Licenses Tables -->
+        <div class="section">
+            <h2>🟡 Unassigned & Not Activated Licenses</h2>
+            <table id="unassignedTable">
+                <thead>
+                    <tr>
+                        <th>License Key</th>
+                        <th>Username</th>
+                        <th>Product</th>
+                        <th>Activations</th>
+                        <th>Expires</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="unassignedBody">
+                    <!-- Filled by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>🟢 Assigned & In Use Licenses</h2>
+            <table id="assignedTable">
+                <thead>
+                    <tr>
+                        <th>License Key</th>
+                        <th>Username</th>
+                        <th>Product</th>
+                        <th>IP Address</th>
+                        <th>Last Seen</th>
+                        <th>Activations</th>
+                        <th>Expires</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="assignedBody">
+                    <!-- Filled by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>🔴 Revoked Licenses</h2>
+            <table id="revokedTable">
+                <thead>
+                    <tr>
+                        <th>License Key</th>
+                        <th>Username</th>
+                        <th>Product</th>
+                        <th>Activations</th>
+                        <th>Expires</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="revokedBody">
+                    <!-- Filled by JavaScript -->
+                </tbody>
+            </table>
+        </div>
     </div>
     
     <script>
@@ -69,11 +117,30 @@
             });
             const data = await response.json();
             
-            const tbody = document.getElementById('licensesBody');
-            tbody.innerHTML = '';
+            // Clear all tables
+            document.getElementById('unassignedBody').innerHTML = '';
+            document.getElementById('assignedBody').innerHTML = '';
+            document.getElementById('revokedBody').innerHTML = '';
             
             data.licenses.forEach(lic => {
-                const row = tbody.insertRow();
+                const isExpired = new Date(lic.expires_at) < new Date();
+                const hasActivations = lic.activation_count > 0;
+                const isAssigned = lic.username && lic.username !== 'Unassigned';
+                
+                // Determine which table this license belongs to
+                let targetTable, targetBody;
+                if (!lic.is_active) {
+                    targetTable = 'revoked';
+                    targetBody = document.getElementById('revokedBody');
+                } else if (!isAssigned && !hasActivations) {
+                    targetTable = 'unassigned';
+                    targetBody = document.getElementById('unassignedBody');
+                } else {
+                    targetTable = 'assigned';
+                    targetBody = document.getElementById('assignedBody');
+                }
+                
+                const row = targetBody.insertRow();
                 
                 // License Key
                 row.insertCell().textContent = lic.license_key;
@@ -83,6 +150,26 @@
                 
                 // Product
                 row.insertCell().textContent = lic.product_id;
+                
+                // Additional columns for assigned table
+                if (targetTable === 'assigned') {
+                    // IP Address
+                    const ipCell = row.insertCell();
+                    if (lic.activations && lic.activations.length > 0) {
+                        ipCell.textContent = lic.activations.map(a => a.ip_address || 'Unknown').join(', ');
+                    } else {
+                        ipCell.textContent = 'Unknown';
+                    }
+                    
+                    // Last Seen
+                    const lastSeenCell = row.insertCell();
+                    if (lic.activations && lic.activations.length > 0) {
+                        const lastSeen = new Date(lic.activations[0].last_seen);
+                        lastSeenCell.textContent = lastSeen.toLocaleString();
+                    } else {
+                        lastSeenCell.textContent = 'Never';
+                    }
+                }
                 
                 // Activations
                 row.insertCell().textContent = `${lic.activation_count}/${lic.max_activations}`;
@@ -96,9 +183,12 @@
                 if (!lic.is_active) {
                     statusCell.textContent = 'REVOKED';
                     statusCell.className = 'revoked';
-                } else if (new Date(lic.expires_at) < new Date()) {
+                } else if (isExpired) {
                     statusCell.textContent = 'EXPIRED';
                     statusCell.className = 'expired';
+                } else if (!isAssigned && !hasActivations) {
+                    statusCell.textContent = 'UNASSIGNED';
+                    statusCell.className = 'unassigned';
                 } else {
                     statusCell.textContent = 'ACTIVE';
                     statusCell.className = 'valid';
@@ -106,15 +196,23 @@
                 
                 // Actions
                 const actionsCell = row.insertCell();
-                if (lic.is_active && new Date(lic.expires_at) >= new Date()) {
+                if (targetTable === 'revoked') {
+                    // Delete button for revoked licenses
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.className = 'delete-btn';
+                    deleteBtn.onclick = () => deleteLicense(lic.license_key);
+                    actionsCell.appendChild(deleteBtn);
+                } else if (lic.is_active && !isExpired) {
+                    // Revoke button for active licenses
                     const revokeBtn = document.createElement('button');
                     revokeBtn.textContent = 'Revoke';
-                    revokeBtn.onclick = () => revokeLicense(lic.license_key);
                     revokeBtn.style.background = '#e74c3c';
                     revokeBtn.style.color = 'white';
                     revokeBtn.style.border = 'none';
                     revokeBtn.style.padding = '5px 10px';
                     revokeBtn.style.cursor = 'pointer';
+                    revokeBtn.onclick = () => revokeLicense(lic.license_key);
                     actionsCell.appendChild(revokeBtn);
                 }
             });
@@ -169,6 +267,27 @@
             });
             
             loadLicenses();
+        }
+        
+        async function deleteLicense(licenseKey) {
+            if (!confirm(`Permanently delete revoked license ${licenseKey}? This action cannot be undone.`)) return;
+            
+            try {
+                const response = await fetch(`/admin/api/licenses/${licenseKey}/delete`, {
+                    method: 'DELETE',
+                    headers: { 'X-API-Key': API_KEY }
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    alert('License deleted successfully!');
+                    loadLicenses();
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                alert(`Error deleting license: ${error.message}`);
+            }
         }
         
         function copyLicense() {
