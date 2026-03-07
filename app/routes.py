@@ -514,11 +514,17 @@ def register_routes(app):
     def admin_panel():
         """Redirect to login or serve admin dashboard"""
         # Check if authenticated via session
+        print(f"🔍 DEBUG - Session data: {dict(session)}")
+        print(f"🔍 DEBUG - admin_authenticated in session: {'admin_authenticated' in session}")
+        print(f"🔍 DEBUG - admin_authenticated value: {session.get('admin_authenticated')}")
+        
         if 'admin_authenticated' in session and session['admin_authenticated']:
+            print("🔍 DEBUG - User is authenticated, serving admin.html")
             # Serve the admin dashboard
             template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates')
             return send_from_directory(template_dir, 'admin.html')
         else:
+            print("🔍 DEBUG - User not authenticated, serving login page")
             # Redirect to login page
             template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates')
             return send_from_directory(template_dir, 'admin_login.html')
