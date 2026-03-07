@@ -30,7 +30,10 @@
         <!-- Generate License Form -->
         <div class="generate-form">
             <h2>Generate New License</h2>
-            <input type="text" id="productId" placeholder="Product ID" value="GREED-TOOL">
+            <select id="productId">
+                <option value="ARENA-RESET">Arena Reset</option>
+                <option value="GREED-TOOL" selected>Greed Tool</option>
+            </select>
             <input type="number" id="maxActivations" placeholder="Max Activations" value="1">
             <select id="expiryType">
                 <option value="hours">Hours</option>

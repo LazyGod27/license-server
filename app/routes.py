@@ -271,11 +271,20 @@ def register_routes(app):
                 log_security_event('DECRYPTION_FAILED', str(e), 'ERROR')
                 return jsonify({'error': f'Decryption failed: {str(e)}'}), 400
         else:
-            # Old format for backward compatibility
+            # Old format for backward compatibility (client sends hwid, license_key, username)
             license_key = data.get('license_key')
             username = data.get('username', '')
-            hardware_data = data.get('hardware_data', {})
+            hardware_data = data.get('hardware_data') or data.get('hwid', '')
+            if hardware_data is None:
+                hardware_data = {}
             log_security_event('LEGACY_REQUEST', f'License: {license_key[:8]}...', 'INFO')
+        
+        # Product validation - clients must send product_id
+        product_id = data.get('product_id') if isinstance(data, dict) else None
+        if not product_id:
+            return jsonify({'error': 'Missing product_id'}), 400
+        if product_id not in ('ARENA-RESET', 'GREED-TOOL'):
+            return jsonify({'error': 'Invalid product_id'}), 400
         
         # Validate username (3-20 chars, alphanumeric)
         if username:
@@ -294,17 +303,24 @@ def register_routes(app):
             log_security_event('DEACTIVATED_LICENSE', f'License: {license_key}', 'WARNING')
             return jsonify({'error': 'License deactivated'}), 401
         
+        # Product must match - Arena Reset licenses only work in Arena Reset, Greed Tool licenses only in Greed Tool
+        if license.product_id != product_id:
+            log_security_event('PRODUCT_MISMATCH', f'License: {license_key} expected {license.product_id}, got {product_id}', 'WARNING')
+            return jsonify({'error': f'This license is for {license.product_id}, not {product_id}'}), 401
+        
         if datetime.utcnow() > license.expires_at:
             log_security_event('EXPIRED_LICENSE', f'License: {license_key}', 'WARNING')
             return jsonify({'error': 'License expired'}), 401
         
         # Generate hardware ID - FIX FOR OLD FORMAT
-        if isinstance(hardware_data, str):
-            # Old format: hardware_data is a string
+        if isinstance(hardware_data, str) and hardware_data:
+            # Old format: hwid or hardware_data as string
             hwid_string = hardware_data
-        else:
+        elif isinstance(hardware_data, dict):
             # New format: hardware_data is a dict
-            hwid_string = f"{hardware_data.get('c', '')}|{hardware_data.get('m', '')}"
+            hwid_string = f"{hardware_data.get('c', '')}|{hardware_data.get('m', '')}" or 'fallback'
+        else:
+            hwid_string = 'unknown'
         hardware_id = hashlib.sha256(hwid_string.encode()).hexdigest()
         
         # Check activation
@@ -385,19 +401,21 @@ def register_routes(app):
         
         data = request.get_json()
         
-        # Generate license key
+        # Generate license key with product-specific prefix
         import secrets
         import string
+        product_id = data.get('product_id', 'GREED-TOOL')
+        prefix = 'ARENA-' if product_id == 'ARENA-RESET' else 'GREED-'
         alphabet = string.ascii_uppercase + string.digits
         random_part = ''.join(secrets.choice(alphabet) for _ in range(16))
-        license_key = f"GREED-{random_part[:4]}-{random_part[4:8]}-{random_part[8:12]}-{random_part[12:16]}"
+        license_key = f"{prefix}{random_part[:4]}-{random_part[4:8]}-{random_part[8:12]}-{random_part[12:16]}"
         
         from datetime import datetime, timedelta
         expires_at = datetime.fromisoformat(data.get('expires_at', '2025-12-31'))
         
         license = License(
             license_key=license_key,
-            product_id=data.get('product_id', 'GREED-TOOL'),
+            product_id=product_id,
             max_activations=data.get('max_activations', 1),
             expires_at=expires_at,
             license_metadata=json.dumps(data.get('features', {}))
