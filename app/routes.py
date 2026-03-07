@@ -220,6 +220,13 @@ def register_routes(app):
         session.clear()
         log_security_event('ADMIN_LOGOUT', 'Session cleared', 'INFO')
         return jsonify({'success': True, 'message': 'Logged out successfully'})
+
+    @app.route('/admin/logout')
+    def admin_logout_redirect():
+        """Direct logout via URL - clears session and redirects to login (escape hatch)"""
+        session.clear()
+        log_security_event('ADMIN_LOGOUT', 'Session cleared via /admin/logout', 'INFO')
+        return redirect(url_for('admin_panel'))
     
     @app.route('/api/v1/verify', methods=['POST'])
     @rate_limit(max_requests=10, window_seconds=60)  # RE-ENABLE RATE LIMITING
@@ -395,8 +402,9 @@ def register_routes(app):
     @app.route('/admin/api/licenses', methods=['POST'])
     @admin_required
     def create_license():
+        # Allow session auth (web UI) or API key (programmatic)
         api_key = request.headers.get('X-API-Key')
-        if api_key != app.config['ADMIN_API_KEY']:
+        if api_key and api_key != app.config['ADMIN_API_KEY']:
             return jsonify({'error': 'Unauthorized'}), 401
         
         data = request.get_json()
@@ -430,7 +438,7 @@ def register_routes(app):
     @admin_required
     def get_stats():
         api_key = request.headers.get('X-API-Key')
-        if api_key != app.config['ADMIN_API_KEY']:
+        if api_key and api_key != app.config['ADMIN_API_KEY']:
             return jsonify({'error': 'Unauthorized'}), 401
         
         stats = {
@@ -446,7 +454,7 @@ def register_routes(app):
     def revoke_license(license_key):
         """Revoke a license so it can't be used anymore"""
         api_key = request.headers.get('X-API-Key')
-        if api_key != app.config['ADMIN_API_KEY']:
+        if api_key and api_key != app.config['ADMIN_API_KEY']:
             return jsonify({'error': 'Unauthorized'}), 401
         
         license = License.query.filter_by(license_key=license_key).first()
@@ -469,7 +477,7 @@ def register_routes(app):
     def delete_license(license_key):
         """Delete a revoked license permanently"""
         api_key = request.headers.get('X-API-Key')
-        if api_key != app.config['ADMIN_API_KEY']:
+        if api_key and api_key != app.config['ADMIN_API_KEY']:
             return jsonify({'error': 'Unauthorized'}), 401
         
         license = License.query.filter_by(license_key=license_key).first()
@@ -512,7 +520,7 @@ def register_routes(app):
                 result.append({
                     'license_key': lic.license_key,
                     'username': lic.username or 'Unassigned',
-                    'product_id': lic.product_id,
+                    'product_id': lic.product_id or 'GREED-TOOL',
                     'max_activations': lic.max_activations,
                     'activation_count': len([a for a in lic.activations if not a.is_revoked]),
                     'expires_at': lic.expires_at.isoformat(),

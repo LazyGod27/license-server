@@ -25,6 +25,7 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h1>🔑 License Server Administration</h1>
             <button onclick="logout()" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">Logout</button>
+            <a href="/admin/logout" style="margin-left: 10px; color: #e74c3c; font-size: 14px;">Force logout</a>
         </div>
         
         <!-- Generate License Form -->
@@ -143,7 +144,7 @@
         
         async function loadLicenses() {
             try {
-                const response = await fetch('/admin/api/licenses');
+                const response = await fetch('/admin/api/licenses', { credentials: 'include' });
                 if (response.status === 401) {
                     // Authentication required, redirect to login
                     sessionStorage.removeItem('adminAuthenticated');
@@ -153,6 +154,10 @@
                 }
                 
                 const data = await response.json();
+                if (data.error || !data.licenses) {
+                    alert(data.error || 'Failed to load licenses. Please try again.');
+                    return;
+                }
                 
                 // Clear all tables
                 document.getElementById('unassignedBody').innerHTML = '';
@@ -297,6 +302,7 @@
             try {
                 const response = await fetch('/admin/api/licenses', {
                     method: 'POST',
+                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json'
                     },
@@ -352,7 +358,8 @@
             
             try {
                 const response = await fetch(`/admin/api/licenses/${licenseKey}/delete`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    credentials: 'include'
                 });
                 
                 if (response.status === 401) {
