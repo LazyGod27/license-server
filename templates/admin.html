@@ -5,6 +5,14 @@
     <style>
         body { font-family: Arial; margin: 20px; background: #f5f5f5; }
         .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 8px; }
+        .navbar { background: #2c3e50; padding: 10px; margin: -20px -20px 20px -20px; border-radius: 8px 8px 0 0; }
+        .navbar ul { list-style-type: none; margin: 0; padding: 0; display: flex; }
+        .navbar li { margin-right: 20px; }
+        .navbar a { color: white; text-decoration: none; padding: 10px 15px; border-radius: 5px; transition: background-color 0.3s; }
+        .navbar a:hover, .navbar a.active { background: #34495e; }
+        .navbar a.active { background: #3498db; }
+        .content-section { display: none; }
+        .content-section.active { display: block; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background: #2c3e50; color: white; }
@@ -28,12 +36,23 @@
             <a href="/admin/logout" style="margin-left: 10px; color: #e74c3c; font-size: 14px;">Force logout</a>
         </div>
         
+        <!-- Navigation Bar -->
+        <div class="navbar">
+            <ul>
+                <li><a href="#" class="nav-link active" data-product="all">All Licenses</a></li>
+                <li><a href="#" class="nav-link" data-product="ARENA-RESET">Arena Reset</a></li>
+                <li><a href="#" class="nav-link" data-product="GREED-TOOL">Greed Tool</a></li>
+                <li><a href="#" class="nav-link" data-product="LOBBY-GREED">Lobby Greed Tool</a></li>
+            </ul>
+        </div>
+        
         <!-- Generate License Form -->
         <div class="generate-form">
             <h2>Generate New License</h2>
             <select id="productId">
                 <option value="ARENA-RESET">Arena Reset</option>
                 <option value="GREED-TOOL" selected>Greed Tool</option>
+                <option value="LOBBY-GREED">Lobby Greed Tool</option>
             </select>
             <input type="number" id="maxActivations" placeholder="Max Activations" value="1">
             <select id="expiryType">
@@ -142,6 +161,23 @@
             window.location.href = '/admin';
         }
         
+        let currentProductFilter = 'all';
+        
+        // Navigation handling
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Update active state
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Update filter
+                currentProductFilter = this.dataset.product;
+                loadLicenses();
+            });
+        });
+        
         async function loadLicenses() {
             try {
                 const response = await fetch('/admin/api/licenses', { credentials: 'include' });
@@ -159,13 +195,19 @@
                     return;
                 }
                 
+                // Filter licenses based on current product filter
+                let filteredLicenses = data.licenses;
+                if (currentProductFilter !== 'all') {
+                    filteredLicenses = data.licenses.filter(lic => lic.product_id === currentProductFilter);
+                }
+                
                 // Clear all tables
                 document.getElementById('unassignedBody').innerHTML = '';
                 document.getElementById('assignedBody').innerHTML = '';
                 document.getElementById('expiredBody').innerHTML = '';
                 document.getElementById('revokedBody').innerHTML = '';
                 
-                data.licenses.forEach(lic => {
+                filteredLicenses.forEach(lic => {
                     const isExpired = new Date(lic.expires_at) < new Date();
                     const hasActivations = lic.activation_count > 0;
                     const isAssigned = lic.username && lic.username !== 'Unassigned';
