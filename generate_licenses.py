@@ -37,7 +37,7 @@ def generate_licenses(count=10):
                     product_id="GREED-TOOL",
                     max_activations=1,
                     expires_at=datetime.utcnow() + timedelta(days=365),
-                    metadata=json.dumps({
+                    license_metadata=json.dumps({
                         "features": ["arena_reset", "lobby"],
                         "version": "1.0.0"
                     })
