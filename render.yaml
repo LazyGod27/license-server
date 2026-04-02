@@ -1,0 +1,26 @@
+services:
+  # Web Service
+  - type: web
+    name: license-server
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 run:app
+    healthCheckPath: /
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false  # You'll set this manually in Render UI
+      - key: REDIS_URL
+        sync: false  # You'll set this manually in Render UI
+      - key: JWT_SECRET
+        sync: false  # You'll set this manually in Render UI
+      - key: ADMIN_API_KEY
+        sync: false  # You'll set this manually in Render UI
+
+  # Redis Service
+  - type: redis
+    name: license-redis
+    plan: free
+    ipAllowList: []  # Only allow connections from your web service

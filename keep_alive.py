@@ -1,8 +1,7 @@
-from app import create_app
-import os
-import threading
 import requests
+import threading
 import time
+import os
 from datetime import datetime
 
 def keep_alive():
@@ -12,11 +11,11 @@ def keep_alive():
     
     while True:
         try:
-            print(f" Keep-alive ping at {datetime.now().strftime('%H:%M:%S')}")
+            print(f"🔄 Keep-alive ping at {datetime.now().strftime('%H:%M:%S')}")
             response = requests.get(health_url, timeout=10)
-            print(f" Keep-alive successful: {response.status_code}")
+            print(f"✅ Keep-alive successful: {response.status_code}")
         except Exception as e:
-            print(f" Keep-alive failed: {e}")
+            print(f"❌ Keep-alive failed: {e}")
         
         # Ping every 10 minutes (Render spins down after 15 minutes)
         time.sleep(600)
@@ -25,14 +24,8 @@ def start_keep_alive():
     """Start the keep-alive thread"""
     thread = threading.Thread(target=keep_alive, daemon=True)
     thread.start()
-    print(" Keep-alive service started")
+    print("🚀 Keep-alive service started")
 
-app = create_app()
-
-if __name__ == '__main__':
-    # Start keep-alive service
+if __name__ == "__main__":
     start_keep_alive()
-    
-    # Run the app
-    port = int(os.getenv('PORT', 8080))  # Railway sets PORT env variable
-    app.run(host='0.0.0.0', port=port, debug=False)
+    keep_alive()  # For testing

@@ -24,10 +24,11 @@ def register_routes(app):
         print(f"🔍 DEBUG - REDIS_PORT: {os.getenv('REDIS_PORT', 'NOT_SET')}")
         print(f"🔍 DEBUG - REDIS_PASSWORD: {'SET' if os.getenv('REDIS_PASSWORD') else 'NOT_SET'}")
         
-        # Try REDIS_URL first (Railway standard)
+        # Try REDIS_URL first (works with both Railway and Render)
         redis_url = os.getenv('REDIS_URL')
         if redis_url:
             print("🔗 Using REDIS_URL format")
+            # Render Redis URLs work directly with redis.from_url
             redis_client = redis.from_url(redis_url, decode_responses=True)
         else:
             # Fallback to separate variables
