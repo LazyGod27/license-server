@@ -291,7 +291,7 @@ def register_routes(app):
         product_id = data.get('product_id') if isinstance(data, dict) else None
         if not product_id:
             return jsonify({'error': 'Missing product_id'}), 400
-        if product_id not in ('ARENA-RESET', 'GREED-TOOL', 'LOBBY-GREED'):
+        if product_id not in ('ARENA-RESET', 'GREED-TOOL', 'LOBBY-GREED', 'MAXGreed'):
             return jsonify({'error': 'Invalid product_id'}), 400
         
         # Validate username (3-20 chars, alphanumeric)
@@ -414,7 +414,7 @@ def register_routes(app):
         import secrets
         import string
         product_id = data.get('product_id', 'GREED-TOOL')
-        prefix = 'ARENA-' if product_id == 'ARENA-RESET' else ('LOBBY-' if product_id == 'LOBBY-GREED' else 'GREED-')
+        prefix = 'ARENA-' if product_id == 'ARENA-RESET' else ('LOBBY-' if product_id == 'LOBBY-GREED' else ('MAXG-' if product_id == 'MAXGreed' else 'GREED-'))
         alphabet = string.ascii_uppercase + string.digits
         random_part = ''.join(secrets.choice(alphabet) for _ in range(16))
         license_key = f"{prefix}{random_part[:4]}-{random_part[4:8]}-{random_part[8:12]}-{random_part[12:16]}"

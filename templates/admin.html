@@ -43,6 +43,7 @@
                 <li><a href="#" class="nav-link" data-product="ARENA-RESET">Arena Reset</a></li>
                 <li><a href="#" class="nav-link" data-product="GREED-TOOL">Greed Tool</a></li>
                 <li><a href="#" class="nav-link" data-product="LOBBY-GREED">Lobby Greed Tool</a></li>
+                <li><a href="#" class="nav-link" data-product="MAXGreed">MaxGreed</a></li>
             </ul>
         </div>
         
@@ -53,6 +54,7 @@
                 <option value="ARENA-RESET">Arena Reset</option>
                 <option value="GREED-TOOL" selected>Greed Tool</option>
                 <option value="LOBBY-GREED">Lobby Greed Tool</option>
+                <option value="MAXGreed">MaxGreed</option>
             </select>
             <input type="number" id="maxActivations" placeholder="Max Activations" value="1">
             <select id="expiryType">
@@ -352,7 +354,10 @@
                         product_id: productId,
                         max_activations: parseInt(maxActivations),
                         expires_at: expires.toISOString().split('T')[0],
-                        features: { "arena_reset": true, "lobby": true }
+                        features: productId === 'MAXGreed' ? 
+                            {"arena_reset": true, "lobby": true, "cards": true, "dropper": true, "bug": true} : 
+                            (productId === 'GREED-TOOL' ? {"dropper": true, "lobby": true, "bug": true} : 
+                             {"arena_reset": true, "lobby": true})
                     })
                 });
                 
