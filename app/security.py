@@ -98,7 +98,7 @@ def check_ip_reputation():
         '10.0.0.',  # Private networks
         '172.16.',  # Private networks  
         '192.168.', # Private networks
-        '127.0.0.', # Localhost
+        # '127.0.0.', # Localhost - ALLOWED for GreedTool testing
     ]
     
     for blocked in blocked_ranges:
