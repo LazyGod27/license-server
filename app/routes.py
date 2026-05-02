@@ -154,6 +154,61 @@ def register_routes(app):
             if ip_address in failed_attempts:
                 del failed_attempts[ip_address]
 
+    # Emergency database initialization - no auth required
+    @app.route('/emergency-init-db', methods=['POST'])
+    def emergency_init_db():
+        """Emergency database initialization - no auth required"""
+        try:
+            from sqlalchemy import text
+            
+            print("🚀 EMERGENCY: Initializing database tables...")
+            
+            # Test database connection with timeout
+            db.session.execute(text('SELECT 1')).scalar()
+            print("✅ EMERGENCY: Database connected successfully")
+            
+            # Create all tables
+            db.create_all()
+            print("✅ EMERGENCY: Tables created successfully")
+            
+            # Verify tables exist
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            tables = inspector.get_table_names()
+            print(f"✅ EMERGENCY: Found tables: {tables}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Database initialized successfully',
+                'tables': tables
+            })
+            
+        except Exception as e:
+            print(f"❌ EMERGENCY: Database initialization failed: {e}")
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    # Health check endpoint
+    @app.route('/health')
+    def health_check():
+        """Health check endpoint"""
+        try:
+            # Test database connection
+            from sqlalchemy import text
+            db.session.execute(text('SELECT 1')).scalar()
+            db_status = "connected"
+        except Exception as e:
+            db_status = f"error: {str(e)}"
+        
+        return jsonify({
+            'status': 'online',
+            'database': db_status,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+
     # SIMPLE HOME PAGE - THIS FIXES THE 502 ERROR!
     @app.route('/')
     def home():
@@ -504,6 +559,17 @@ def register_routes(app):
         """List all licenses with activation details"""
         try:
             print("🔍 DEBUG: list_licenses called - fetching licenses...")
+            
+            # Check if tables exist, create if needed
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            tables = inspector.get_table_names()
+            
+            if 'licenses' not in tables:
+                print("📋 Tables don't exist, creating them...")
+                db.create_all()
+                print("✅ Tables created")
+            
             licenses = License.query.all()
             result = []
             
