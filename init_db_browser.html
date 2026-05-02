@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Initialization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            background-color: #f8f9fa;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .warning {
+            color: #ffc107;
+            font-weight: bold;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .server-url {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗄️ Database Initialization Tool</h1>
+        
+        <div class="step">
+            <h3>Step 1: Login to Admin Panel</h3>
+            <p>First, you need to login to your license server admin panel:</p>
+            <div class="server-url">https://license-server-016g.onrender.com/admin</div>
+            <p><strong>Username:</strong> filbertace<br>
+            <strong>Password:</strong> eca@09976944805</p>
+            <button onclick="window.open('https://license-server-016g.onrender.com/admin', '_blank')">Open Admin Panel</button>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Initialize Database</h3>
+            <p>After logging in, click the button below to create the database tables:</p>
+            <button id="initDbBtn" onclick="initializeDatabase()">Initialize Database Tables</button>
+            <button id="generateLicensesBtn" onclick="generateTestLicenses()" disabled>Generate 5 Test Licenses</button>
+        </div>
+
+        <div class="step">
+            <h3>Step 3: Check Results</h3>
+            <p>The results will appear below. Wait for success messages before proceeding:</p>
+            <div id="result"></div>
+        </div>
+
+        <div class="step warning">
+            <h3>⚠️ Important Notes</h3>
+            <ul>
+                <li>Run this <strong>only once</strong> after setting up a new database</li>
+                <li>Make sure you're logged into the admin panel first</li>
+                <li>Wait for each step to complete before clicking the next button</li>
+                <li>If there are errors, check your Render dashboard logs</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+
+        // Function to get auth token from admin panel
+        async function getAuthToken() {
+            try {
+                // Login to get session token
+                const response = await fetch('https://license-server-016g.onrender.com/admin/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'filbertace',
+                        password: 'eca@09976944805'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.token;
+                    return true;
+                } else {
+                    throw new Error('Login failed');
+                }
+            } catch (error) {
+                logResult('❌ Login failed. Please login to admin panel first: https://license-server-016g.onrender.com/admin', 'error');
+                return false;
+            }
+        }
+
+        async function initializeDatabase() {
+            const btn = document.getElementById('initDbBtn');
+            const result = document.getElementById('result');
+            
+            btn.disabled = true;
+            btn.textContent = 'Initializing...';
+            result.textContent = '🚀 Initializing database tables...\n';
+
+            try {
+                // Get auth token
+                const loggedIn = await getAuthToken();
+                if (!loggedIn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Initialize Database Tables';
+                    return;
+                }
+
+                // Initialize database
+                const response = await fetch('https://license-server-016g.onrender.com/admin/api/init-db', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    logResult(`✅ Database initialized successfully!\n\nTables created: ${data.tables.join(', ')}\n\n🎉 Database is ready for license generation!`, 'success');
+                    document.getElementById('generateLicensesBtn').disabled = false;
+                } else {
+                    logResult(`❌ Database initialization failed:\n\n${data.error}\n\nCheck your Render dashboard logs for more details.`, 'error');
+                }
+            } catch (error) {
+                logResult(`❌ Error: ${error.message}\n\nMake sure you're logged into the admin panel first.`, 'error');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Initialize Database Tables';
+        }
+
+        async function generateTestLicenses() {
+            const btn = document.getElementById('generateLicensesBtn');
+            
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            logResult('🎯 Generating 5 test licenses...\n');
+
+            try {
+                const response = await fetch('https://license-server-016g.onrender.com/admin/api/generate-test-licenses', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    logResult(`✅ 5 test licenses generated successfully!\n\nLicense keys:\n${data.licenses.map((lic, i) => `${i+1}. ${lic}`).join('\n')}\n\n🎉 Your license server is now fully functional!`, 'success');
+                } else {
+                    logResult(`❌ License generation failed:\n\n${data.error}`, 'error');
+                }
+            } catch (error) {
+                logResult(`❌ Error: ${error.message}`, 'error');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Generate 5 Test Licenses';
+        }
+
+        function logResult(message, type = '') {
+            const result = document.getElementById('result');
+            result.textContent = message;
+            result.className = type;
+        }
+    </script>
+</body>
+</html>

@@ -537,6 +537,99 @@ def register_routes(app):
             traceback.print_exc()
             return jsonify({'error': 'Failed to load licenses'}), 500
     
+    # Database initialization endpoint
+    @app.route('/admin/api/init-db', methods=['POST'])
+    @admin_required
+    def init_database():
+        """Initialize database tables - run this once after setting up new database"""
+        api_key = request.headers.get('X-API-Key')
+        if api_key and api_key != app.config['ADMIN_API_KEY']:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        try:
+            from sqlalchemy import text
+            
+            print("🚀 Initializing database tables...")
+            
+            # Test database connection
+            db.session.execute(text('SELECT 1')).scalar()
+            print("✅ Database connected successfully")
+            
+            # Create all tables
+            db.create_all()
+            print("✅ Tables created successfully")
+            
+            # Verify tables exist
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            tables = inspector.get_table_names()
+            print(f"✅ Found tables: {tables}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Database initialized successfully',
+                'tables': tables
+            })
+            
+        except Exception as e:
+            print(f"❌ Database initialization failed: {e}")
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/admin/api/generate-test-licenses', methods=['POST'])
+    @admin_required
+    def generate_test_licenses():
+        """Generate 5 test licenses after database initialization"""
+        api_key = request.headers.get('X-API-Key')
+        if api_key and api_key != app.config['ADMIN_API_KEY']:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        try:
+            import secrets
+            import string
+            
+            print("🎯 Generating 5 test licenses...")
+            
+            licenses_created = []
+            for i in range(5):
+                random_part = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(16))
+                license_key = f"GREED-{random_part[:4]}-{random_part[4:8]}-{random_part[8:12]}-{random_part[12:16]}"
+                
+                license = License(
+                    license_key=license_key,
+                    product_id="GREED-TOOL",
+                    max_activations=1,
+                    expires_at=datetime.utcnow() + timedelta(days=365),
+                    license_metadata=json.dumps({
+                        "features": ["arena_reset", "lobby"],
+                        "version": "1.0.0",
+                        "product_name": "GreedTool"
+                    })
+                )
+                
+                db.session.add(license)
+                licenses_created.append(license_key)
+            
+            db.session.commit()
+            print("✅ 5 test licenses created successfully!")
+            
+            return jsonify({
+                'success': True,
+                'message': '5 test licenses generated',
+                'licenses': licenses_created
+            })
+            
+        except Exception as e:
+            print(f"❌ License generation failed: {e}")
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
     @app.route('/admin')
     def admin_panel():
         """Redirect to login or serve admin dashboard"""
