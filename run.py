@@ -1,38 +1,5 @@
 from app import create_app
 import os
-import threading
-import requests
-import time
-from datetime import datetime
 
-def keep_alive():
-    """Send periodic requests to keep the app alive"""
-    app_url = os.getenv('RENDER_EXTERNAL_URL', 'https://license-server-016g.onrender.com')
-    health_url = f"{app_url}/"
-    
-    while True:
-        try:
-            print(f" Keep-alive ping at {datetime.now().strftime('%H:%M:%S')}")
-            response = requests.get(health_url, timeout=10)
-            print(f" Keep-alive successful: {response.status_code}")
-        except Exception as e:
-            print(f" Keep-alive failed: {e}")
-        
-        # Ping every 10 minutes (Render spins down after 15 minutes)
-        time.sleep(600)
-
-def start_keep_alive():
-    """Start the keep-alive thread"""
-    thread = threading.Thread(target=keep_alive, daemon=True)
-    thread.start()
-    print(" Keep-alive service started")
-
+# Create app instance for Gunicorn
 app = create_app()
-
-if __name__ == '__main__':
-    # Start keep-alive service
-    start_keep_alive()
-    
-    # Run the app
-    port = int(os.getenv('PORT', 8080))  # Railway sets PORT env variable
-    app.run(host='0.0.0.0', port=port, debug=False)
